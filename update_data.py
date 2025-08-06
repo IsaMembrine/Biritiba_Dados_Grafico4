@@ -59,12 +59,6 @@ def baixar_arquivos(all_file_links):
         downloaded_files[node_id] = []
         for link in links:
             filename = link.split('/')[-1]
-
-            # 💥 Ignora arquivos com "health" no nome
-            if 'health' in filename.lower():
-                print(f"🛑 Arquivo ignorado por conter 'health': {filename}")
-                continue
-
             if 'current' in filename.lower():
                 baixar = True
             else:
@@ -73,14 +67,10 @@ def baixar_arquivos(all_file_links):
                     ano = int(partes[-2])
                     mes = int(partes[-1].split('.')[0])
                     baixar = (ano, mes) in meses
-                except Exception as e:
-                    print(f"⚠️ Ignorado por nome fora do padrão: {filename} ({e})")
+                except:
                     continue
-
             if not baixar:
-                print(f"⏩ Arquivo ignorado por não estar dentro dos meses desejados: {filename}")
                 continue
-
             full_url = base_url + link
             response = requests.get(full_url, auth=auth)
             if response.status_code == 200:
@@ -88,11 +78,7 @@ def baixar_arquivos(all_file_links):
                 with open(filepath, 'wb') as f:
                     f.write(response.content)
                 downloaded_files[node_id].append(filepath)
-                print(f"✅ Arquivo baixado: {filename}")
-            else:
-                print(f"❌ Erro ao baixar {filename}: {response.status_code}")
     return downloaded_files
-
 
 def processar_arquivos(downloaded_files):
     all_dataframes = {}
@@ -156,17 +142,22 @@ def analisar_e_salvar(all_dataframes):
     df_cleaned.drop_duplicates(subset=['Date', 'Time_Rounded'], inplace=True)
     p_cols = [c for c in df_cleaned.columns if c.startswith('p-')]
     df_selected = df_cleaned[['Date-and-time', 'Time_Rounded'] + p_cols].copy()
-    melted = df_selected.melt(id_vars=['Date-and-time', 'Time_Rounded'], value_vars=p_cols,
-                              var_name='Node_p_Column', value_name='Value')
+    melted = df_selected.melt(
+        id_vars=['Date-and-time', 'Time_Rounded'],
+        value_vars=p_cols,
+        var_name='Node_p_Column',
+        value_name='Value'
+    )
     melted.dropna(subset=['Value'], inplace=True)
     melted['Month'] = melted['Date-and-time'].dt.to_period('M')
     melted['Node_ID'] = melted['Node_p_Column'].apply(lambda x: x.split('-')[1])
+
     counts = melted.groupby(['Month', 'Node_ID']).size().reset_index(name='Monthly_Data_Count')
     counts['Days_in_Month'] = counts['Month'].dt.days_in_month
     counts['Max_Data'] = counts['Days_in_Month'] * 24
     counts['Monthly_Attendance_Percentage'] = (counts['Monthly_Data_Count'] / counts['Max_Data']) * 100
-    monthy_selecionado = counts[['Month', 'Node_ID', 'Monthly_Attendance_Percentage']].copy()
 
+    monthy_selecionado = counts[['Month', 'Node_ID', 'Monthly_Attendance_Percentage']].copy()
     monthy_selecionado['Month'] = pd.to_datetime(monthy_selecionado['Month'].astype(str)).dt.to_period('M').dt.to_timestamp()
 
     df_corr_real = calcular_correlacao_mensal(todos_nos)
