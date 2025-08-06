@@ -59,6 +59,12 @@ def baixar_arquivos(all_file_links):
         downloaded_files[node_id] = []
         for link in links:
             filename = link.split('/')[-1]
+
+            # 💥 Ignora arquivos com "health" no nome
+            if 'health' in filename.lower():
+                print(f"🛑 Arquivo ignorado por conter 'health': {filename}")
+                continue
+
             if 'current' in filename.lower():
                 baixar = True
             else:
@@ -67,10 +73,14 @@ def baixar_arquivos(all_file_links):
                     ano = int(partes[-2])
                     mes = int(partes[-1].split('.')[0])
                     baixar = (ano, mes) in meses
-                except:
+                except Exception as e:
+                    print(f"⚠️ Ignorado por nome fora do padrão: {filename} ({e})")
                     continue
+
             if not baixar:
+                print(f"⏩ Arquivo ignorado por não estar dentro dos meses desejados: {filename}")
                 continue
+
             full_url = base_url + link
             response = requests.get(full_url, auth=auth)
             if response.status_code == 200:
@@ -78,7 +88,11 @@ def baixar_arquivos(all_file_links):
                 with open(filepath, 'wb') as f:
                     f.write(response.content)
                 downloaded_files[node_id].append(filepath)
+                print(f"✅ Arquivo baixado: {filename}")
+            else:
+                print(f"❌ Erro ao baixar {filename}: {response.status_code}")
     return downloaded_files
+
 
 def processar_arquivos(downloaded_files):
     all_dataframes = {}
